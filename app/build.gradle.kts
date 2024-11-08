@@ -64,8 +64,10 @@ dependencies {
     implementation(libs.androidx.leanback)
     implementation(libs.coil.kt.coil.compose)
     implementation(libs.volley)
+    implementation(libs.androidx.runtime.livedata)
 
     testImplementation(libs.junit)
+    testImplementation(libs.androidx.ui.test.junit4.android)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

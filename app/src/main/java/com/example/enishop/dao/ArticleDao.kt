@@ -8,4 +8,6 @@ interface ArticleDao {
     fun insert(article: Article): Long
 
     fun getAllArticles(): List<Article>
+
+    fun getAllCategorie(): List<String>
 }

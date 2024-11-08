@@ -14,6 +14,18 @@ class ArticleDAOMemoryImpl : ArticleDao {
         return article.id
     }
 
+    override fun getAllCategorie(): List<String> {
+        return categoryInMemory
+    }
+
+    private var categoryInMemory = mutableListOf<String>()
+
+    init{
+        categoryInMemory.add("men's clothing")
+        categoryInMemory.add("women's clothing")
+
+    }
+
     override fun getAllArticles(): List<Article> {
         return articleInMemory
     }
@@ -47,7 +59,7 @@ class ArticleDAOMemoryImpl : ArticleDao {
             description = "great outerwear jackets for Spring/Autumn/Winter, suitable for many occasions, such as working, hiking, camping, mountain/rock climbing, cycling, traveling or other outdoors. Good gift choice for you or your family member. A warm hearted love to Father, husband or son in this thanksgiving or Christmas Day.",
             price = 55.99,
             imageUrl = "https://fakestoreapi.com/img/71li-ujtlUL._AC_UX679_.jpg",
-            category = "men's clothing",
+            category = "women's clothing",
             date = Date(),
         ))
     }

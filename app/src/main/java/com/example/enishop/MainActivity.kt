@@ -14,12 +14,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -31,8 +34,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -43,6 +46,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -52,8 +56,14 @@ import com.example.enishop.bo.Article
 import com.example.enishop.form.FormScreen
 import com.example.enishop.repository.ArticleRepository
 import com.example.enishop.ui.theme.EniShopTheme
+import com.example.enishop.vm.ArticleListViewModel
 import java.text.SimpleDateFormat
 import java.util.Locale
+import android.content.Intent
+import android.net.Uri
+import android.app.Activity
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,7 +74,7 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 NavHost(navController = navController, startDestination = "articleList") {
                     composable("articleList") {
-                        ArticleListScreen(navController)
+                        ArticleListScreen(navController, ArticleRepository)
                     }
                     composable("articleDetail/{articleId}") { backStackEntry ->
                         val articleId = backStackEntry.arguments?.getString("articleId")?.toLongOrNull()
@@ -76,12 +86,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     composable("formScreen") {
-                        FormScreen(
-                            name = remember { mutableStateOf("") },
-                            email = remember { mutableStateOf("") },
-                            isFormSubmitted = remember { mutableStateOf(false) },
-                            onSubmit = { /* Logique de soumission du formulaire */ }
-                        )
+                        FormScreen(navController)
                     }
                 }
             }
@@ -99,6 +104,18 @@ fun ArticleCard(article: Article, onDetailClick: (Article) -> Unit) {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            Box(
+                modifier = Modifier
+                    .height(200.dp)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                AsyncImage(
+                    model = article.imageUrl,
+                    contentDescription = null,
+                    modifier = Modifier.size(200.dp)
+                )
+            }
             Text(text = article.name)
             Text(text = "Price: ${article.price} €")
             Button(
@@ -118,7 +135,12 @@ fun ArticleDetailScreen(
     navController: NavController,
     article: Article
 ) {
+
+    val context = LocalContext.current as Activity
     var isFavorite by remember { mutableStateOf(false) }
+    val query = article.name
+    val searchUrl = "https://www.bing.com/search?q=$query"
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(searchUrl))
 
     Scaffold(
         topBar = {
@@ -176,7 +198,7 @@ fun ArticleDetailScreen(
             ) {
                 Text(
                     text = "Prix : ${article.price} €",
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = 8.dp).testTag("prixText")
                 )
                 Text(
                     text = "Date : ${SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(article.date)}",
@@ -193,22 +215,28 @@ fun ArticleDetailScreen(
                 )
                 Text(text = "Favori", modifier = Modifier.padding(start = 8.dp))
             }
+            Button(
+                onClick = {
+                    context.startActivity(intent)
+                }
+            ) {
+                Text(text = "Comparer les pris sur internet de : ${article.name}")
+            }
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ArticleListScreen(navController: NavController) {
-    var articles by remember { mutableStateOf<List<Article>>(emptyList()) }
+fun ArticleListScreen(navController: NavController, articleRepository: ArticleRepository) {
+    val viewModel: ArticleListViewModel = viewModel(
+        factory = ArticleListViewModel.provideFactory(articleRepository)
+    )
 
-    LaunchedEffect(Unit) {
-        articles = ArticleRepository.getArticles()
-    }
+    val articles by viewModel.articles.observeAsState(emptyList())
+    val categories by viewModel.categories.observeAsState(emptyList())
 
-    val onButtonClick = {
-        navController.navigate("formScreen")
-    }
+    var selectedCategory by remember { mutableStateOf("All") }
 
     Scaffold(
         topBar = {
@@ -225,27 +253,47 @@ fun ArticleListScreen(navController: NavController) {
                             fontWeight = FontWeight.Bold,
                             fontSize = 40.sp,
                         )
+                        IconButton(onClick = { navController.navigate("formScreen")}) {
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "send")
+                        }
                     }
                 }
             )
         }
     ) { innerPadding ->
-
         Column(modifier = Modifier.padding(innerPadding)) {
-            LazyColumn(modifier = Modifier.padding(top = 16.dp)) {
-                items(articles) { article ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                categories.forEach { category ->
+                    Button(
+                        onClick = { selectedCategory = category },
+                        colors = if (selectedCategory == category) ButtonDefaults.buttonColors(
+                            containerColor = Color.Magenta,
+                            contentColor = Color.White
+                        ) else ButtonDefaults.buttonColors()
+                    ) {
+                        Text(category)
+                    }
+                }
+            }
+
+            val filteredArticles = if (selectedCategory == "All") articles else articles.filter { it.category == selectedCategory }
+
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(filteredArticles) { article ->
                     ArticleCard(article) { selectedArticle ->
                         navController.navigate("articleDetail/${selectedArticle.id}")
                     }
                 }
-            }
-            Button(
-                onClick = onButtonClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            ) {
-                Text("Ajouter un article")
             }
         }
     }

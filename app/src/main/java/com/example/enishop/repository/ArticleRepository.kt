@@ -24,4 +24,9 @@ object ArticleRepository {
     fun getArticles(): List<Article>{
         return articleDao.getAllArticles()
     }
+
+    fun getCategories(): List<String>{
+        return articleDao.getAllCategorie()
+
+    }
 }
